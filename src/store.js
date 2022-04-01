@@ -32,6 +32,7 @@ export class Store {
     this._mutations = Object.create(null)
     this._wrappedGetters = Object.create(null)
     this._modules = new ModuleCollection(options)
+    // 根据命名空间存放module {a:moduleA,b:moduleB}
     this._modulesNamespaceMap = Object.create(null)
     this._subscribers = []
     this._watcherVM = new Vue()
@@ -50,6 +51,48 @@ export class Store {
     // strict mode
     this.strict = strict
 
+
+//! this._modules的数据结构类型；
+    
+//返回数据结构实例 整体是src/module/module.js中Module的实例组成树形结构
+/*
+{
+  root：{
+      runtime,
+      state:rawModule.state,
+      _rawModule:rawModule,
+      namespaced:rawModule.namespaced
+      _children:{
+        a:{
+          runtime,
+          state:aRawModule.state,
+          _rawModule:aRawModule,
+          namespaced:aRawModule.namespaced,
+          _children:{
+            c:{
+              runtime,
+              state:cRawModule.state,
+              _rawModule:cRawModule,
+              namespaced:cRawModule.namespaced
+              _children:{
+              }
+            }
+          }
+        },
+        b:{
+          runtime,
+          state:bRawModule.state,
+          _rawModule:bRawModule,
+          namespaced:bRawModule.namespaced,
+          _children:{
+          }
+        }
+      }
+
+  }
+}
+*/
+
     const state = this._modules.root.state
     //这里的state 也仅仅是第一层的state；
 
@@ -58,6 +101,8 @@ export class Store {
     // init root module.
     // this also recursively registers all sub-modules
     // and collects all module getters inside this._wrappedGetters
+
+    //todotodototototo======>
     installModule(this, state, [], this._modules.root)
 
     // initialize the store vm, which is responsible for the reactivity
@@ -333,6 +378,7 @@ function resetStoreVM (store, state, hot) {
 
 function installModule (store, rootState, path, module, hot) {
   const isRoot = !path.length
+  //
   const namespace = store._modules.getNamespace(path)
 
   // register in namespace map
@@ -340,11 +386,13 @@ function installModule (store, rootState, path, module, hot) {
     if (store._modulesNamespaceMap[namespace] && __DEV__) {
       console.error(`[vuex] duplicate namespace ${namespace} for the namespaced module ${path.join('/')}`)
     }
+    //? 给store上的_modulesNamespaceMap
     store._modulesNamespaceMap[namespace] = module
   }
 
   // set state
   if (!isRoot && !hot) {
+    //找到path的导数第二个值得state2，然后把导数第一个值val1得state1注册到state2,state2[val1]= state1
     const parentState = getNestedState(rootState, path.slice(0, -1))
     const moduleName = path[path.length - 1]
     store._withCommit(() => {
@@ -355,10 +403,11 @@ function installModule (store, rootState, path, module, hot) {
           )
         }
       }
+      //找到父亲的state ，然后给父state加上子模块命名空间的state ：a的state:{b:bState}
       Vue.set(parentState, moduleName, module.state)
     })
   }
-
+// !todototootototot
   const local = module.context = makeLocalContext(store, namespace, path)
 
   module.forEachMutation((mutation, key) => {
@@ -521,6 +570,7 @@ function enableStrictMode (store) {
   }, { deep: true, sync: true })
 }
 
+// 给定state，拿state对顶的path数组命名的[a,b]的state 相当于读取，state.a.b
 function getNestedState (state, path) {
   return path.reduce((state, key) => state[key], state)
 }

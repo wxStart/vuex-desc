@@ -15,6 +15,45 @@ import { assert, forEachValue } from '../util'
     }
     */
 
+
+//!返回数据结构实例 整体是src/module/module.js中Module的实例组成树形结构
+/*
+{
+  root：{
+      runtime,
+      state:rawModule.state,
+      _rawModule:rawModule,
+      namespaced:rawModule.namespaced
+      _children:{
+        a:{
+          runtime,
+          state:aRawModule.state,
+          _rawModule:aRawModule,
+          namespaced:aRawModule.namespaced,
+          _children:{
+            c:{
+              runtime,
+              state:cRawModule.state,
+              _rawModule:cRawModule,
+              namespaced:cRawModule.namespaced
+              _children:{
+              }
+            }
+          }
+        },
+        b:{
+          runtime,
+          state:bRawModule.state,
+          _rawModule:bRawModule,
+          namespaced:bRawModule.namespaced,
+          _children:{
+          }
+        }
+      }
+
+  }
+}
+*/
 export default class ModuleCollection {
   constructor (rawRootModule) {
     // register root module (Vuex.Store options)
