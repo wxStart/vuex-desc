@@ -51,6 +51,9 @@ export class Store {
     this.strict = strict
 
     const state = this._modules.root.state
+    //这里的state 也仅仅是第一层的state；
+
+    
 
     // init root module.
     // this also recursively registers all sub-modules

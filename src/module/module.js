@@ -7,7 +7,7 @@ export default class Module {
     // Store some children item
     this._children = Object.create(null)
     // Store the origin module object which passed by programmer
-    this._rawModule = rawModule
+    this._rawModule = rawModule  
     const rawState = rawModule.state
 
     // Store the origin module's state
@@ -35,6 +35,7 @@ export default class Module {
   }
 
   update (rawModule) {
+    //更新 模块主要更新的是actions actions   getters
     this._rawModule.namespaced = rawModule.namespaced
     if (rawModule.actions) {
       this._rawModule.actions = rawModule.actions
