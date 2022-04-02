@@ -410,11 +410,21 @@ function installModule (store, rootState, path, module, hot) {
   // local  返回对应命名空间 {dispatch,commit,getters,state}
   const local = module.context = makeLocalContext(store, namespace, path)
 
-  //todoto=====>
+
   /**
    * 对 module.mutations 执行传入的函数
-   * mutations对象为{a:aMutation}
-   * 
+   * mutations对象为{a:aMutation,b:bMutation}
+   * （aMutation,a）=>{
+   *  const namespacedType = namespace + key
+      registerMutation(store, namespacedType, mutation, local)
+   * }
+
+      给全局的store._mutations[namespacedType]=[mutation] 
+      如果a子模块的mutations对象为{a:aMutation,b:bMutation}，则
+      store._mutations[a/a]=[aMutationHandler];
+      store._mutations[a/b]=[bMutationHandler]
+      aMutationHandler和bMutationHandler的两个参数，分别是:
+      a模块的state和 调用时候传递的载荷payload，主要是aMutationHandler执行时候传递的参数
    * 
    */
    
@@ -423,11 +433,44 @@ function installModule (store, rootState, path, module, hot) {
     registerMutation(store, namespacedType, mutation, local)
   })
 
+ /**
+   * 对 module.actions 执行传入的函数
+   * actions对象为{a:aActions}
+   * aActions可以是一个对象，里面有root属性和handler，或者是一个函数
+   * （aActions,a）=>{
+   *  const type = action.root ? key : namespace + key
+      const handler = action.handler || action
+      registerAction(store, type, handler, local)
+   * }
+
+      给全局的store._actions[type]=[（action] 
+      如果a子模块的 actions 对象为{a:aMutation,}，则
+      store._actions[a/a]=[aActionsHandler] ，命名空间里面存的是个action数组;
+      aActionsHandler的参数分别是 有两个,第一个是{
+        dispatch: local.dispatch,
+      commit: local.commit,
+      getters: local.getters,
+      state: local.state,
+      rootGetters: store.getters,
+      rootState: store.state
+      };
+      第二个参数是 aActionsHandler调用时候传过来的载荷；
+      如果，aMutation执行的结果非，promise则使用Promise.resolve包装结果
+   * 
+   */
+
+
+  //todoto=====>
   module.forEachAction((action, key) => {
     const type = action.root ? key : namespace + key
+
+    //
     const handler = action.handler || action
     registerAction(store, type, handler, local)
   })
+
+
+
 
   module.forEachGetter((getter, key) => {
     const namespacedType = namespace + key
@@ -544,8 +587,11 @@ function makeLocalGetters (store, namespace) {
 }
 
 function registerMutation (store, type, handler, local) {
+
+ // 模块的mutatoin根据 
   const entry = store._mutations[type] || (store._mutations[type] = [])
   entry.push(function wrappedMutationHandler (payload) {
+     // 参数局部state 和 传入的载荷参数
     handler.call(store, local.state, payload)
   })
 }
