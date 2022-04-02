@@ -68,7 +68,8 @@ export default class ModuleCollection {
     }, this.root)
   }
 
-   // 格局path数组 获取完整的命令空间
+   // 格局path数组 获取完整的命令空间,根节点返回的是''
+   // 子节点返回的是a/c  
   getNamespace (path) {
     let module = this.root
     return path.reduce((namespace, key) => {

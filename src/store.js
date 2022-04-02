@@ -36,7 +36,7 @@ export class Store {
     this._modulesNamespaceMap = Object.create(null)
     this._subscribers = []
     this._watcherVM = new Vue()
-    this._makeLocalGettersCache = Object.create(null)
+    this._makeLocalGettersCache = Object.create(null)  //makeLocalGetters方法在设置值
 
     // bind commit and dispatch to self
     const store = this
@@ -379,7 +379,7 @@ function resetStoreVM (store, state, hot) {
 function installModule (store, rootState, path, module, hot) {
   const isRoot = !path.length
   //
-  const namespace = store._modules.getNamespace(path)
+  const namespace = store._modules.getNamespace(path) // g
 
   // register in namespace map
   if (module.namespaced) {
@@ -407,9 +407,17 @@ function installModule (store, rootState, path, module, hot) {
       Vue.set(parentState, moduleName, module.state)
     })
   }
-// !todototootototot
+  // local  返回对应命名空间 {dispatch,commit,getters,state}
   const local = module.context = makeLocalContext(store, namespace, path)
 
+  //todoto=====>
+  /**
+   * 对 module.mutations 执行传入的函数
+   * mutations对象为{a:aMutation}
+   * 
+   * 
+   */
+   
   module.forEachMutation((mutation, key) => {
     const namespacedType = namespace + key
     registerMutation(store, namespacedType, mutation, local)
@@ -434,9 +442,21 @@ function installModule (store, rootState, path, module, hot) {
 /**
  * make localized dispatch, commit, getters and state
  * if there is no namespace, just use root ones
+ * 
+ * 根据命名空间找到对应dispatch和 commit，返回
+ * {
+ * }
  */
+/**
+ * 
+ * @param {*} store  就是真个store
+ * @param {*} namespace 命名空间 a/c //?! 这里待考证
+ * @param {*} path  完整 path数组[a,c]
+ * @returns 返回对应命名空间 {dispatch,commit,getters,state}
+ */
+
 function makeLocalContext (store, namespace, path) {
-  const noNamespace = namespace === ''
+  const noNamespace = namespace === '' // 根节点
 
   const local = {
     dispatch: noNamespace ? store.dispatch : (_type, _payload, _options) => {
@@ -474,6 +494,7 @@ function makeLocalContext (store, namespace, path) {
 
   // getters and state object must be gotten lazily
   // because they will be changed by vm update
+  // 定义了getters 和 state
   Object.defineProperties(local, {
     getters: {
       get: noNamespace
@@ -488,6 +509,13 @@ function makeLocalContext (store, namespace, path) {
   return local
 }
 
+/**
+ * 
+ * @param {*} store 全局的store
+ * @param {*} namespace  "a/c"
+ * @returns  返回 'a/c'的getters
+ * @des 通过制定命名的空间，返回geteers,同时全局缓存_makeLocalGettersCache中
+ */
 function makeLocalGetters (store, namespace) {
   if (!store._makeLocalGettersCache[namespace]) {
     const gettersProxy = {}
@@ -497,11 +525,13 @@ function makeLocalGetters (store, namespace) {
       if (type.slice(0, splitPos) !== namespace) return
 
       // extract local getter type
+      // namespace为 a/c 截取下标3的（从c后面的/处开始）后半段，如'a/c/cG',最终是cG
       const localType = type.slice(splitPos)
 
       // Add a port to the getters proxy.
       // Define as getter property because
       // we do not want to evaluate the getters in this time.
+      // 通过cG访问 store.getters['a/c/cG']
       Object.defineProperty(gettersProxy, localType, {
         get: () => store.getters[type],
         enumerable: true
@@ -509,7 +539,7 @@ function makeLocalGetters (store, namespace) {
     })
     store._makeLocalGettersCache[namespace] = gettersProxy
   }
-
+  //全局缓存_makeLocalGettersCache
   return store._makeLocalGettersCache[namespace]
 }
 
@@ -575,6 +605,14 @@ function getNestedState (state, path) {
   return path.reduce((state, key) => state[key], state)
 }
 
+/**
+ * 
+ * @param {String||Object} type 
+ * @param {*} payload 
+ * @param {*} options 
+ * @returns {type,payload,options}
+ * @desc 如果type是对象 ，返回{type:type.type,payload:type,options:payload},否则直接返回{type,payload,options}
+ */
 function unifyObjectStyle (type, payload, options) {
   if (isObject(type) && type.type) {
     options = payload
