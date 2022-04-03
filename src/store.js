@@ -51,9 +51,7 @@ export class Store {
     // strict mode
     this.strict = strict
 
-
 //! this._modules的数据结构类型；
-    
 //返回数据结构实例 整体是src/module/module.js中Module的实例组成树形结构
 /*
 {
@@ -92,21 +90,19 @@ export class Store {
   }
 }
 */
-
-    const state = this._modules.root.state
     //这里的state 也仅仅是第一层的state；
-
-    
+    const state = this._modules.root.state
 
     // init root module.
     // this also recursively registers all sub-modules
     // and collects all module getters inside this._wrappedGetters
 
-    //todotodototototo======>
     installModule(this, state, [], this._modules.root)
 
     // initialize the store vm, which is responsible for the reactivity
     // (also registers _wrappedGetters as computed properties)
+    
+    //todotodototototo======>
     resetStoreVM(this, state)
 
     // apply plugins
@@ -137,7 +133,7 @@ export class Store {
     } = unifyObjectStyle(_type, _payload, _options)
 
     const mutation = { type, payload }
-    const entry = this._mutations[type]
+    const entry = this._mutations[type] 
     if (!entry) {
       if (__DEV__) {
         console.error(`[vuex] unknown mutation type: ${type}`)
@@ -392,7 +388,7 @@ function installModule (store, rootState, path, module, hot) {
 
   // set state
   if (!isRoot && !hot) {
-    //找到path的导数第二个值得state2，然后把导数第一个值val1得state1注册到state2,state2[val1]= state1
+    // 找到path的导数第二个值得state2，然后把导数第一个值val1得state1注册到state2,state2[val1]= state1
     const parentState = getNestedState(rootState, path.slice(0, -1))
     const moduleName = path[path.length - 1]
     store._withCommit(() => {
@@ -403,7 +399,7 @@ function installModule (store, rootState, path, module, hot) {
           )
         }
       }
-      //找到父亲的state ，然后给父state加上子模块命名空间的state ：a的state:{b:bState}
+      // 找到父亲的state ，然后给父state加上子模块命名空间的state ：a的state:{b:bState}
       Vue.set(parentState, moduleName, module.state)
     })
   }
@@ -416,15 +412,16 @@ function installModule (store, rootState, path, module, hot) {
    * mutations对象为{a:aMutation,b:bMutation}
    * （aMutation,a）=>{
    *  const namespacedType = namespace + key
-      registerMutation(store, namespacedType, mutation, local)
+      registerMutation(store, namespacedType, aMutation, local)
    * }
 
-      给全局的store._mutations[namespacedType]=[mutation] 
-      如果a子模块的mutations对象为{a:aMutation,b:bMutation}，则
-      store._mutations[a/a]=[aMutationHandler];
-      store._mutations[a/b]=[bMutationHandler]
-      aMutationHandler和bMutationHandler的两个参数，分别是:
-      a模块的state和 调用时候传递的载荷payload，主要是aMutationHandler执行时候传递的参数
+      // !给全局的store._mutations[namespacedType]=[mutation] 
+      //! 如果a子模块的mutations对象为{a:aMutation,b:bMutation}，则
+      //! store._mutations[a/a]=[aMutationHandler];
+      //! store._mutations[a/b]=[bMutationHandler]
+      //! aMutationHandler和bMutationHandler的仅支持一个参数（是在commit调用时候传入的参数payload），
+      //! aMutationHandler在调用的时候也会调用aMutation，aMutation(aState,payload)
+      aState就是子模块a的state，payload就是传入的数据也就是我们写的mutation的第二个参数
    * 
    */
    
@@ -435,32 +432,34 @@ function installModule (store, rootState, path, module, hot) {
 
  /**
    * 对 module.actions 执行传入的函数
-   * actions对象为{a:aActions}
-   * aActions可以是一个对象，里面有root属性和handler，或者是一个函数
-   * （aActions,a）=>{
-   *  const type = action.root ? key : namespace + key
-      const handler = action.handler || action
+   * actions对象为{a:aAction}
+   * aAction可以是一个对象，里面有root属性和handler，或者是一个函数
+   * （aAction,a）=>{
+   *  const type = aAction.root ? key : namespace + key
+      const handler = aAction.handler || aAction
       registerAction(store, type, handler, local)
    * }
 
-      给全局的store._actions[type]=[（action] 
-      如果a子模块的 actions 对象为{a:aMutation,}，则
-      store._actions[a/a]=[aActionsHandler] ，命名空间里面存的是个action数组;
-      aActionsHandler的参数分别是 有两个,第一个是{
-        dispatch: local.dispatch,
-      commit: local.commit,
-      getters: local.getters,
-      state: local.state,
-      rootGetters: store.getters,
-      rootState: store.state
-      };
-      第二个参数是 aActionsHandler调用时候传过来的载荷；
+      //! 给全局的store._actions[type]=[action] 
+      //! 如果a子模块的 actions 对象为{a:aActions,}，则
+      //! store._actions[a/a]=[aActionsHandler] ，命名空间里面存的是个action数组;
+      //! aActionsHandler中会执行aAction函数，aActionsHandler函数仅支持传入一个参数。
+      //! aAction的参数分别是 有两个,第一个是{
+      //! dispatch: local.dispatch,
+      //! commit: local.commit,
+      //! getters: local.getters,
+      //! state: local.state,
+      //! rootGetters: store.getters,
+      //! rootState: store.state
+      //! };
+      //! 所有我们在调用action时候可以从第一个参数里面结构处 commit，dispatch对象，可以进行commit提交，或者发起新的dispath
+      第二个参数是 aActionsHandler调用时候传过来的载荷,我们调用dispatch时候传入的载荷
+      //!aAction执行的最终结果会是Promise对象
       如果，aMutation执行的结果非，promise则使用Promise.resolve包装结果
    * 
    */
 
 
-  //todoto=====>
   module.forEachAction((action, key) => {
     const type = action.root ? key : namespace + key
 
@@ -471,12 +470,38 @@ function installModule (store, rootState, path, module, hot) {
 
 
 
+ /**
+   * 对 module.getters 执行传入的函数
+   * 模块的getters对象为{a:aGetters}
+   * aActions可以是一个对象，里面有root属性和handler，或者是一个函数
+   * （(aGetters, a) => {
+      const namespacedType = namespace + a
+      registerGetter(store, namespacedType, aGetters, local)
+    }
 
+      给全局的store._wrappedGetters[type]=[aGetters] 
+      如果a子模块的 actions 对象为{a:aGetters,}，则
+      store._wrappedGetters[a/a]= aGettersHandler ，命名空间里面存的是个getters函数;
+      aGettersHandler函数执行时候在会执行aGetters(aState,aGetters,rootState,rootGetters)
+      //!aState,aGetters,rootState,rootGetters这里就是我们写的getters时候四个参数：
+      //!当前子模块的state，当前子模块的getters，根模快的state，更模块的geeters
+   * 
+   */
   module.forEachGetter((getter, key) => {
     const namespacedType = namespace + key
     registerGetter(store, namespacedType, getter, local)
   })
-
+  /*
+    *
+    //! 递归对每个module._children 对象执行installModule方法，进一步注册 mutations、actions、getters
+    //! 同时会在makeLocalContext函数中处理子模块的 dispatch、commit、getters和state属性
+    //! 同时补全 
+   store._makeLocalGettersCache: 根据getter的命名空间缓存geeter结果 ，主要是 makeLocalContext函数中计算了getter的结果；
+   store._mutations: 根据mutation的命名空间 存放mutation数组
+   store._actions: 根据action的命名空间 存放ction数组
+   stroe._wrappedGetters: 根据geeter的命名空间存放geeter函数
+   *
+  */
   module.forEachChild((child, key) => {
     installModule(store, rootState, path.concat(key), child, hot)
   })
