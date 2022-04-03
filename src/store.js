@@ -90,7 +90,7 @@ export class Store {
   }
 }
 */
-    //这里的state 也仅仅是第一层的state；
+    // 这里的state 也仅仅是第一层的state；
     const state = this._modules.root.state
 
     // init root module.
@@ -101,10 +101,31 @@ export class Store {
 
     // initialize the store vm, which is responsible for the reactivity
     // (also registers _wrappedGetters as computed properties)
-    
-    //todotodototototo======>
+    // 此时的this是没有_vm属性，经过resetStoreVM创建了 _vm 属性，是一个Vue实例
+    // 响应式state和_wrappedGetters
+    // 此时的经过 installModule函数的处理state结构
+    // {
+    //   ...rawModule.state
+    //   a:{
+    //     ...aRawModule.state,
+    //     c:{...cRawModule.state}
+    //   }
+    //   b:{
+    //    ...bRawModule.state
+    //   }
+    // }
+
+    // _wrappedGetters结构,aG为a模块的getters中的aG属性和属性对应的值都为aG表示
+    // {
+    // a/aG:aG,
+    // a/c/cG:cG
+    // b/bG:bG
+    // }
+    //
+    console.log('JSON.stringify(state): ', JSON.stringify(state));
     resetStoreVM(this, state)
 
+    //todotodototototo======>
     // apply plugins
     plugins.forEach(plugin => plugin(this))
 
@@ -288,6 +309,7 @@ export class Store {
     resetStore(this, true)
   }
 
+   // 临时改变_committing状态，执行fn函数后还原_committing状态
   _withCommit (fn) {
     const committing = this._committing
     this._committing = true
@@ -322,22 +344,44 @@ function resetStore (store, hot) {
   resetStoreVM(store, state, hot)
 }
 
+
+/**
+ * 将state响应式
+ * 重置传入stroe的_vm属性（_vm为new Vue）,其实传入的 store就是根Store
+ * @param {*} store
+ * @param {*} state
+ * @param {*} hot
+ * @desc  给传入进来的store根据state创创建_vm 属性的vue实例，
+ * 同时访问 store的getters的属性时候相当于访问_vm的属性，形成响应式
+ */
 function resetStoreVM (store, state, hot) {
-  const oldVm = store._vm
+  //第一次执行没有该属性，
+  const oldVm = store._vm  
 
   // bind store public getters
   store.getters = {}
   // reset local getters cache
+  //清空缓存 makeLocalGetters函数创建的命名空间结果存储对象_makeLocalGettersCache
   store._makeLocalGettersCache = Object.create(null)
   const wrappedGetters = store._wrappedGetters
   const computed = {}
+
+  //  对 wrappedGetters执行 第二个函数操作，函数的参数分别是wrappedGetters的key对应的值，和key
+  //  wrappedGetters ={a:aGetter} (aGetter,key)
   forEachValue(wrappedGetters, (fn, key) => {
     // use computed to leverage its lazy-caching mechanism
     // direct inline function use will lead to closure preserving oldVm.
     // using partial to return function with only arguments preserved in closure environment.
-    computed[key] = partial(fn, store)
+    //! computed[key] =function(){
+    //    fn(store)
+    //  }
+
+    // computed[a] = function(){ aGetter(store) } //这里的store只是一个形参
+    computed[key] = partial(fn, store) // 
+
+    // 获取getters对象的key属性值时候，就相当于或者的_vm的对应key属性值
     Object.defineProperty(store.getters, key, {
-      get: () => store._vm[key],
+      get: () => store._vm[key], // 从
       enumerable: true // for local getters
     })
   })
@@ -346,6 +390,8 @@ function resetStoreVM (store, state, hot) {
   // suppress warnings just in case the user has added
   // some funky global mixins
   const silent = Vue.config.silent
+  //?! 临时改变 silent属性 执行new Vue（）
+  //?! 为什么临时改变，暂时开不知道
   Vue.config.silent = true
   store._vm = new Vue({
     data: {
@@ -356,10 +402,12 @@ function resetStoreVM (store, state, hot) {
   Vue.config.silent = silent
 
   // enable strict mode for new vm
+  // options.strict 存在时候参会执行
   if (store.strict) {
     enableStrictMode(store)
   }
 
+  // 在执行resetStoreVM之前  传入进来的store有_vm实例，先卸载掉旧的，因为不管如果都会重新创建_vm实例
   if (oldVm) {
     if (hot) {
       // dispatch changes in all subscribed watchers

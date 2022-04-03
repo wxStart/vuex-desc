@@ -66,6 +66,12 @@ export function assert (condition, msg) {
   if (!condition) throw new Error(`[vuex] ${msg}`)
 }
 
+/**
+ * 
+ * @param {*} fn 
+ * @param {*} arg 
+ * @returns  返回函数，返回的里面执行fn同时把arg作为fn的参数
+ */
 export function partial (fn, arg) {
   return function () {
     return fn(arg)
