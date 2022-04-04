@@ -28,13 +28,13 @@ export class Store {
     // store internal state
     this._committing = false
     this._actions = Object.create(null)
-    this._actionSubscribers = []
+    this._actionSubscribers = []//  subscribeAction注册函数存放队列，默认是action执行之前执行，
     this._mutations = Object.create(null)
     this._wrappedGetters = Object.create(null)
     this._modules = new ModuleCollection(options)
     // 根据命名空间存放module {a:moduleA,b:moduleB}
     this._modulesNamespaceMap = Object.create(null)
-    this._subscribers = []
+    this._subscribers = []  //  subscribe注册的函数队列
     this._watcherVM = new Vue()
     this._makeLocalGettersCache = Object.create(null)  //makeLocalGetters方法在设置值
 
@@ -210,6 +210,7 @@ export class Store {
       }
     }
 
+    // 同名的多次注册的action ，返回的是一个存放action的结果数组，只注册一次返回的执行的结果
     const result = entry.length > 1
       ? Promise.all(entry.map(handler => handler(payload)))
       : entry[0](payload)
@@ -424,6 +425,7 @@ function installModule (store, rootState, path, module, hot) {
   const isRoot = !path.length
   //
   const namespace = store._modules.getNamespace(path) // g
+  console.log('namespace: ', path, namespace );
 
   // register in namespace map
   if (module.namespaced) {
