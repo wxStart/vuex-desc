@@ -511,6 +511,7 @@ function installModule (store, rootState, path, module, hot) {
 
 
   module.forEachAction((action, key) => {
+    // root属性存在 执行的是不带命名空间的 dispatch
     const type = action.root ? key : namespace + key
 
     //

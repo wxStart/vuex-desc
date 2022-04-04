@@ -37,7 +37,7 @@ const modules = {
     //!namespaced:true,子模块必须有这个属性  才会返回 moduleA +'/' +key ,否则都是直接使用key
     state:{ a : 'aaa' };
     getters:{
-      aG:function(aState,aGetters,rootState,rootGetters){
+      aG:function aG(aState,aGetters,rootState,rootGetters){
         return  (rootGetters.rootGetterB + aState.a)
       }
     },
@@ -195,7 +195,91 @@ _modulesNamespaceMap ={
 }
 ```
 
++ _wrappedGetters  
 
+根据命名空间存放包装getter后的处理函数 wrappedGetter
+```
+_wrappedGetters ={
+  // 这里的store就是store实例，也是根模块
+  rootGetterB:function wrappedGetter(store){
+    return  rootGetterB( 
+        rootState, // 当前模块的 state
+        rootGetters, // 当前模块getters
+        store.state , //  rootState
+        store.getters  //  rootGetters 
+        )
+
+  }
+  moduleA/aG: function wrappedGetter(store){
+    return aG( 
+      aState, // 当前模块moduleA的 state
+      aGetters, // 当前模块moduleA的getters
+      store.state , //  rootState
+      store.getters  //  rootGetters
+      )
+  }
+}
+```
+
++ _vm 属性
+_vm 是一个vue实例,computed是根据 _wrappedGetters对象生成的。
+```
+computed ={
+  // 就是我们写options里面的rootGetterB函数
+  rootGetterB : _wrappedGetters[rootGetterB](store) ,
+  moduleA/aG : _wrappedGetters[moduleA/aG](store) 
+
+}
+_vm  =new Vue({
+  data:{
+     $$state: state // 这里的state就是，处理过的所有state的一个对象。
+  }
+  computed
+})
+```
+
++ getters 对象
+存放的是根据命名空间的访问的属性key和value， key是命名，value是通过代理方位了store._vm[key];
+
+```
+ 
+```
+```
+  getters ={
+    rootGetterB:{
+      get(){
+        return store_vm['rootGetterB']
+      }
+    },
+    'moduleA/aG':{
+      get(){
+        return store_vm['moduleA/aG']
+      }
+    },
+  }
+
+```
+
+
++ _makeLocalGettersCache  
+根据命名空间，缓存子模块的计算属性结果，仅在访问子模块的计算属性（getter）时候才进行缓存结果，最终是根据命名空间访问了store.getters，同时 store.getters访问的是 store._vm ,_vm是一个vue实例。所以访问 getters里面的属性就是响应式的了。
+
+_makeLocalGettersCache ={
+  moduleA/aG: {
+    aG:{
+        get(){
+        return  store.getters['moduleA/aG']
+        /*
+        store.getters['moduleA/aG']:{
+        get(){
+          return  store._vm['moduleA/aG']
+        }
+        }
+        */
+      }
+    }
+  }
+}
 
 
 
