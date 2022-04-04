@@ -23,7 +23,7 @@ export default {
 
 + install里面在Vue的v2版本使用的mixin混入，在beforeCreate这个生命周期中给每个Vue的实例挂载$store属性，所有每个实例都可以通过
 
-+ options.store 是根实例才有的属性，非根实例，就需要用option.parent.$store 属性。刚好利用了beforeCreate的生命周期，父beforeCreate执行后，字beforeCreate执行，所以父亲肯定有$store属性，保证了顺序。
++ options.store 是根实例才有的属性，非根实例，就需要用option.parent.$store 属性。刚好利用了beforeCreate的生命周期，父beforeCreate执行后，子beforeCreate执行，所以父亲肯定有$store属性，保证了顺序。
 
 
 #### Store类 的说明
@@ -280,6 +280,48 @@ _makeLocalGettersCache ={
   }
 }
 ```
+
++ state  
+所有的state的集合，访问时候实际上访问的的是 ``` this._vm._data.$$state ```;在对模块执行installModule时候，对所有的模块处理生成state的结构如下：
+```
+  // 初始值
+  // state ={rootStateA:'rootA'}
+  // 具体的实现代码
+  state = this._modules.root.state;
+  // installModule函数中每次根据传入的路径path数组
+  /* path.slice(0, -1),从第一位截取到非追后一位，根据截取的path找到父state，然后在父state中追加子state，key为path的最后一位，非根节点才会执行这个 追加子state；
+  
+  对于子模块moduleA的path为['moduleA']
+  moduleA的父节点state就是根模块的state；
+  
+  */
+  
+  //state['moduleA'] =aState;
+  // 具体的实现代码
+  Vue.set(parentState, moduleName, module.state)
+
+
+  //最终 state的值为
+state ={
+  rootStateA:'rootA', //这里是根state
+  moduleA: { a : 'aaa' } // 这里是模块moduleA的state
+  }
+
+```
+  
++ _subscribers 
+store.subscribe 注册的函数队列，数组。每次执行mutation时候都会执行这个队列里面的函数,在mutation函数执行之后    
+
++ _actionSubscribers
+
+store.subscribeAction 注册函数存放队列，数组。默认是action执行之前执行。
+注册的函数可以值一个函数，也可以是一个对象，如果是函数fn会被处理成一个对象：{
+  before:fn
+},如果是一个对象，这个对象就是类似这种结构{
+  before:bFn, //action函数执行之前
+  after:aFn,  //action函数执行之后
+  error:eFn   //action 执行出错时候执行 的函数
+}
 
 
 
