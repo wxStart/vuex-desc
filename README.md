@@ -313,7 +313,6 @@ state ={
 store.subscribe 注册的函数队列，数组。每次执行mutation时候都会执行这个队列里面的函数,在mutation函数执行之后    
 
 + _actionSubscribers
-
 store.subscribeAction 注册函数存放队列，数组。默认是action执行之前执行。
 注册的函数可以值一个函数，也可以是一个对象，如果是函数fn会被处理成一个对象：{
   before:fn
