@@ -332,5 +332,225 @@ store.subscribeAction 注册函数存放队列，数组。默认是action执行�
 执行 ``` dispatch ``` 会根据传入的type从 ``` _actions ```中找到对应的actions数组函数，在执行actions数组之前会执行，``` this._actionSubscribers ```中有 ``` before ``` 以及before对应的函数bFn，接着执行  actions数组函数（如果是多个，则用Promise.all去执行的，一个是直接执行actions[0](payload),执行完毕后，actions执行的结果是`Promise对象`,没有错误会执行``` this._actionSubscribers ```中有 ``` after ```属性对应的after对应的函数aFn，如果执行actions过程中有错误，则会执行 ``` this._actionSubscribers ```中有 ``` error ```属性对应的error函数eFn。   
 
 
+### 执行过程说明
+
+1. `Vue.use(Vuex)`
+执行这个时候，给所有的vue实例都混入了一个在 ` beforeCreate `生命周期中执行 的函数，每一个`vue实例`都可以通过 `$store`访问 `Vuex.Store`的实例。
+
+2. `new Vuex.Store(options)`
+执行这个时候,执行了`constructor`函数。
+2.1 创建一些属性,值得含义在上文讲过
+```
+    this._committing = false;
+    this._actions = Object.create(null);
+    this._actionSubscribers = [];
+    this._mutations = Object.create(null);
+    this._wrappedGetters = Object.create(null);
+    this._modules = new ModuleCollection(options)
+    this._modulesNamespaceMap = Object.create(null);
+    this._subscribers = [];
+    this._watcherVM = new Vue();
+    this._makeLocalGettersCache = Object.create(null); 
+```
+2.1.1 在执行`ModuleCollection`创建`_modules`可以参考上文提到的`Store类 的说明中的 _modules`，此时`_modules`的结果如下:
+```
+// 这里在 Store类 的说明中的 _modules 的说明中是相同的
+_modules = {
+ root:{
+   runtime:false,
+   state：{ rootStateA:'rootA'}, //
+   _rawModule: options, //就是传入的options
+   _children:{
+     moduleA:{
+       runtime:false,
+       state:{a : 'aaa' },
+       _rawModule: moduleA,
+       _children: {}
+     }
+   },
+ }
+}
+
+```
+2.2 实现了`commit` 和 ` dispatch`两个重要的函数，同时绑定了上下文`this`
+
+```
+    //  dispatch
+   this.dispatch = function boundDispatch (type, payload) {
+      return dispatch.call(store, type, payload)
+    }
+
+
+  // commit
+  this.commit = function boundCommit (type, payload, options) {
+    return commit.call(store, type, payload, options)
+  }
+
+```
+
+2.3 执行 installModule函数
+
+执行`installModule(store,rootState,path,module,hot)` ,`installModule`函数有五个参数，按顺序分别为
+store：store实例,
+rootState：根state,
+path：path模块名字的数组,
+module: path对应的module模块
+hot: 一个判断标记位，可不关注，为false和非根模块时候执行的一些东西   
+
+`第一次`执行的时候传入的参数`installModule(store,this._modules.root.state, [],this._modules.root)`,最后一个`hot`参数不穿为false。
+
+根据传入进来的path得到的模块名字是`namespace = "" `,以及判断出来是`根模块`; 
+
+2.3.1 执行获取上下文函数 makeLocalContext(store,namespace),获取当前模块的`state`和`getters`的 `local对象`。
+  `第一次`执行`makeLocalContext(sotre,'')`,根据`namespace == ''`为空判断出为没有namespace `const noNamespace = true`,创建local对象，对于根模块其实就是store对象的部分属性
+
+ `
+ {
+   dispatch: store.dispatch,
+   commit: store.commit,
+   getters: store.getters,
+   state: store.state // 通过get属性和getNestedState(store.state,[])方法得到。访问时候就会执行get方法。
+ }
+ 
+ `
+2.3.2 注册 mutaions， _mutations对象的数据来源
+给 `Store类 的说明 中 _mutations` 中注测带命名的包装mutaion的函数 wrappedMutationHandler 的数组。
+把我们写的 rootMutationA函数封装了一层，在调用this.this.$store.commit('rootMutationA',payload),时候就会调用 wrappedMutationHandler(payload),同时会调用我们自己写的rootActionA函数,同时把当前模块的state作为第一个参数，payload作为第二个参数
+ 
+
+这时候的 `module 是 this._modules.root`;`forEachMutation`方法可以在 `Module实例`中查看('src/module/module.js')
+
+```
+  module.forEachMutation((mutation, key) => {
+    const namespacedType = namespace + key 
+    // 此时的 namespace为"", key就是根模块中的 mutaions中命名函数，如 ”rootMutationA“，
+    // 所以 namespacedType = "rootMutationA"
+    // mutation 为 根模块中的 rootMutationA函数
+    registerMutation(store, namespacedType, mutation, local)
+  })
+```
+上述函数执行完成后 `Store类 的说明 中 _mutations`暂时就变成了如下：
+```
+  // local为  步骤 2.3.1中生成的local对象 
+  _mutations['rootMutationA'] = [ 
+    function wrappedMutationHandler(payload){
+      rootMutationA.call(store,
+        // 我们写的模板中第一个参数
+        local.state,  
+        // 我们写的模板中的第二个参数
+        payload
+      )
+    }
+  ]
+```
+
+2.3.3 注册 actions ，_actions的数据来源   
+给 `Store类 的说明 中 _actions` 中注测带命名的包装action的函数 wrappedActionHandler 的数组。  
+把我们写的 rootActionA函数封装了一层，在调用this.$store.dispatch('rootActionA',payload),时候就会调用 wrappedActionHandler(payload),同时会调用我们自己写的rootActionA函数
+ 
+这时候的 `module 是 this._modules.root`;
+```
+  module.forEachAction((action, key) => {
+    // root属性存在 执行的是不带命名空间的，我们自己定义 action如果带了root为真的属性，其实相当于直接注册key的ation，而不是子模块命名空间+key的action
+    const type = action.root ? key : namespace + key
+    const handler = action.handler || action
+    registerAction(store, type, handler, local)
+  })
+  
+```
+  
+上述函数执行完成后 `Store类 的说明 中 _actions`暂时就变成了如下：
+
+
+```
+ // local为  步骤 2.3.1中生成的local对象
+ // action 函数的执行结果是个 Promise对象
+
+ _actions['rootActionA'] = [ 
+    function wrappedActionHandler(payload){
+      let res = rootActionA.call(store, 
+        // 我们写的模板中第一个参数
+        {
+        dispatch: local.dispatch, 
+        commit: local.commit,
+        getters: local.getters,
+        state: local.state,
+        rootGetters: store.getters,
+        rootState: store.state
+        }, 
+        // 我们写的模板中的第二个参数
+        payload
+      );
+      if (!isPromise(res)) {
+        res = Promise.resolve(res)
+      }
+      if (store._devtoolHook) {
+        return res.catch(err => {
+          store._devtoolHook.emit('vuex:error', err)
+          throw err
+        })
+      } else {
+        return res
+      }
+    }
+  ]
+```
+
+2.3.4  注册getters函数模板，_wrappedGetters 数据来源
+
+给 `Store类 的说明 中 _wrappedGetters` 中注测带命名的包装getter的函数 wrappedGetter函数。  
+
+把我们写的 rootGetterB 函数封装了一层，生成_wrappedGetters， 在调用执行后续的`resetStoreVM`函数,时候就会生成一个包装wrappedGetter的函数
+`function wrappedGetterComputed（）{ wrappedGetter(store) } `传入根store对象,
+`生成一个vue的computed：{rootGetterB: wrappedGetterComputed }`,利用vue的计算属性，来调用`wrappedGetterComputed`,同时调用了 `wrappedGetter` 以及我们自己写的`rootGetterB`函数，在这个函数里面已经包装好了参数`local.state, local.getters, store.state,store.getters`
+
+这时候的 `module 是 this._modules.root`;
+
+```
+  module.forEachGetter((action, key) => {
+    const namespacedType = namespace + key
+    //namespacedType为 ""+'rootGetterB'
+    // getter 为 根模块中getters的 rootGetterB 
+    registerGetter(store, namespacedType, getter, local)
+  
+  })
+  
+```
+
+
+  
+上述函数执行完成后 `Store类 的说明 中 _wrappedGetters`暂时就变成了如
+下：
+
+```
+
+ // local为  步骤 2.3.1中生成的local对象
+_wrappedGetters={
+  rootGetterB: wrappedGetter(store){ //store是在调用 resetStoreVM 传入的
+     return rawGetter(
+      local.state, 
+      local.getters, 
+      store.state,
+      store.getters
+  }
+}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
