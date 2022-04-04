@@ -100,7 +100,7 @@ const store =  new Vuex.Store(options);
 在构造函数中会创建一些属性，如下:
 
 +  _committing  是一个状态值，表示是否在执行commit操作，默认是false，为true时候表示正在执行某个mutation的操作。 
-+  _actions  是一个根据命名和命名空间对应的处理action函数wrappedActionHandler函数的数组的映射关系的对象，
++  _actions  是一个根据命名和命名空间对应的处理action函数wrappedActionHandler函数的数组的映射关系的对象，方便快速找到指定type对应的actions
 ```
 
 _actions = {
@@ -142,7 +142,7 @@ _actions = {
 ```
 
 
-+  _mutations 是一个根据命名和命名空间对应的处理mutation函数的映射关系的对象
++  _mutations 是一个根据命名和命名空间对应的处理mutation函数的映射关系的对象，方便快速找到指定type对应的mutaions
 
 ```
 _mutations = {
