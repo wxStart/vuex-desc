@@ -102,7 +102,8 @@ const store =  new Vuex.Store(options);
 +  _committing  是一个状态值，表示是否在执行commit操作，默认是false，为true时候表示正在执行某个mutation的操作。 
 +  _actions  是一个根据命名和命名空间对应的处理action函数wrappedActionHandler函数的数组的映射关系的对象，
 ```
-{
+
+_actions = {
   rootActionA: [
     /* wrappedActionHandler会把我们给的 rootActionA包装一下；
        在执行dispatch时候会执行， wrappedActionHandler时候执行真是的rootActionA;
@@ -144,7 +145,7 @@ const store =  new Vuex.Store(options);
 +  _mutations 是一个根据命名和命名空间对应的处理mutation函数的映射关系的对象
 
 ```
-{
+_mutations = {
   rootMutationA: [
     /* wrappedMutationHandler会把我们给的 rootMutationA包装一下；
        在执行commit时候会执行， wrappedMutationHandler时候执行真是的rootMutationA;
@@ -242,9 +243,6 @@ _vm  =new Vue({
 存放的是根据命名空间的访问的属性key和value， key是命名，value是通过代理方位了store._vm[key];
 
 ```
- 
-```
-```
   getters ={
     rootGetterB:{
       get(){
@@ -264,6 +262,7 @@ _vm  =new Vue({
 + _makeLocalGettersCache  
 根据命名空间，缓存子模块的计算属性结果，仅在访问子模块的计算属性（getter）时候才进行缓存结果，最终是根据命名空间访问了store.getters，同时 store.getters访问的是 store._vm ,_vm是一个vue实例。所以访问 getters里面的属性就是响应式的了。
 
+```
 _makeLocalGettersCache ={
   moduleA/aG: {
     aG:{
@@ -280,6 +279,7 @@ _makeLocalGettersCache ={
     }
   }
 }
+```
 
 
 
