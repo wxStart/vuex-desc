@@ -1,6 +1,6 @@
 # Vuex源码学习
 
-### 入口文件 src/index.cjs.js
+## 入口文件 src/index.cjs.js
 
 ```
 export default {
@@ -17,7 +17,7 @@ export default {
 
 ```
 
-#### install 方法说明
+### install 方法说明
 
 + Vue.use(Vuex)时候就会调用install，但是install是先执行，然后Vue实例是后执行，所以利用mixin混入生命周期来执行一些后续才执行的代码。   
 
@@ -26,7 +26,7 @@ export default {
 + options.store 是根实例才有的属性，非根实例，就需要用option.parent.$store 属性。刚好利用了beforeCreate的生命周期，父beforeCreate执行后，子beforeCreate执行，所以父亲肯定有$store属性，保证了顺序。
 
 
-#### Store类 的说明
+### Store类 的说明
 
 
 使用一下参数作为options参数作为Store类的参数
@@ -310,7 +310,7 @@ state ={
 ```
   
 + _subscribers 
-store.subscribe 注册的函数队列，数组。每次执行mutation时候都会执行这个队列里面的函数,在mutation函数执行之后    
+store.subscribe 注册的函数队列，数组。每次执行mutation时候都会执行这个队列里面的函数,在mutation函数执行之后。      
 
 + _actionSubscribers
 store.subscribeAction 注册函数存放队列，数组。默认是action执行之前执行。
@@ -320,16 +320,16 @@ store.subscribeAction 注册函数存放队列，数组。默认是action执行�
   before:bFn, //action函数执行之前
   after:aFn,  //action函数执行之后
   error:eFn   //action 执行出错时候执行 的函数
-}
+}。
 
 + _withCommit 函数
-内部使用的，参是一个函数，主要是执行传入的函数，在执行前改变一下 this._committing 属性，执行完毕后，还原之前的 _committing状态     
+内部使用的，参是一个函数，主要是执行传入的函数，在执行前改变一下 this._committing 属性，执行完毕后，还原之前的 _committing状态。     
 
 +  commit 函数
-执行 ```commit``` 会根据传入的type从 ```_mutations```拿到 mutations数组函数，然后通过 _withCommit去执行mutations数组中的每一个函数，就真正的执行了我们写的 mutaion，执行完毕后，会执行 ``` this._subscribers ```数组中的函数，在执行mutations数组过程中 `_committing`状态一定会临时变成true，执行完成后会恢复成执行之前的状态   
+执行 ```commit``` 会根据传入的type从 ```_mutations```拿到 mutations数组函数，然后通过 _withCommit去执行mutations数组中的每一个函数，就真正的执行了我们写的 mutaion，执行完毕后，会执行 ``` this._subscribers ```数组中的函数，在执行mutations数组过程中 `_committing`状态一定会临时变成true，执行完成后会恢复成执行之前的状态。     
 
 + dispatch 函数
-执行 ``` dispatch ``` 会根据传入的type从 ``` _actions ```中找到对应的actions数组函数，在执行actions数组之前会执行，``` this._actionSubscribers ```中有 ``` before ``` 以及before对应的函数bFn，接着执行  actions数组函数（如果是多个，则用Promise.all去执行的，一个是直接执行actions[0](payload),执行完毕后，actions执行的结果是`Promise对象`,没有错误会执行``` this._actionSubscribers ```中有 ``` after ```属性对应的after对应的函数aFn，如果执行actions过程中有错误，则会执行 ``` this._actionSubscribers ```中有 ``` error ```属性对应的error函数eFn
+执行 ``` dispatch ``` 会根据传入的type从 ``` _actions ```中找到对应的actions数组函数，在执行actions数组之前会执行，``` this._actionSubscribers ```中有 ``` before ``` 以及before对应的函数bFn，接着执行  actions数组函数（如果是多个，则用Promise.all去执行的，一个是直接执行actions[0](payload),执行完毕后，actions执行的结果是`Promise对象`,没有错误会执行``` this._actionSubscribers ```中有 ``` after ```属性对应的after对应的函数aFn，如果执行actions过程中有错误，则会执行 ``` this._actionSubscribers ```中有 ``` error ```属性对应的error函数eFn。   
 
 
 
