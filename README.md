@@ -395,27 +395,140 @@ store：store实例,
 rootState：根state,
 path：path模块名字的数组,
 module: path对应的module模块
-hot: 一个判断标记位，可不关注，为false和非根模块时候执行的一些东西   
+hot: 一个判断标记位，可不关注，为false和非根模块时候执行的一些东西,
 
-`第一次`执行的时候传入的参数`installModule(store,this._modules.root.state, [],this._modules.root)`,最后一个`hot`参数不穿为false。
+根据传入进来的path得到的模块名字是`namespace = "" `,以及判断出来是`根模块`;    
 
-根据传入进来的path得到的模块名字是`namespace = "" `,以及判断出来是`根模块`; 
+
+
+ `第一次`, 根模块执行的时候传入的参数`installModule(store,this._modules.root.state, [],this._modules.root)`,最后一个`hot`参数不穿为false。 
+
+
+ `非第一次执行`, 也就是子模块执行时候`installModule(store实例,当前子模块的state, path为父模块的path.concat(当前模块的key), module当前子模块, hot为父节点使用的hot)  `，所以对于本次实例是，对于子模块 `moduleA` 执行`nstallModule`的参数如下：   
+
+  ```
+    installModule(
+      store, // store实例
+      this._modules.root.state, // 根模块的state
+      ['moduleA'], // 他的父模块，也就是根模块的path.concat(key),即[].concat('moduleA')
+      this._modules.root._children.moduleA,
+      hot // 他的父模块也就是根模块传进来的hot，
+      )
+
+  ```
+
+
 
 2.3.1 执行获取上下文函数 makeLocalContext(store,namespace),获取当前模块的`state`和`getters`的 `local对象`。
-  `第一次`执行`makeLocalContext(sotre,'')`,根据`namespace == ''`为空判断出为没有namespace `const noNamespace = true`,创建local对象，对于根模块其实就是store对象的部分属性
+  `第一次`，根模块执行时候，执行`makeLocalContext(sotre,'')`,根据`namespace == ''`为空判断出为没有namespace `const noNamespace = true`,创建local对象，对于根模块其实就是store对象的部分属性
 
- `
- {
-   dispatch: store.dispatch,
-   commit: store.commit,
-   getters: store.getters,
-   state: store.state // 通过get属性和getNestedState(store.state,[])方法得到。访问时候就会执行get方法。
- }
- 
- `
+  ```
+  {
+    dispatch: store.dispatch,
+    commit: store.commit,
+    getters: store.getters,
+    state: store.state // 通过get属性和getNestedState(store.state,[])方法得到。访问时候就会执行get方法。
+  }
+  
+  ```
+
+
+  `非第一次执行`, 也就是子模块执行时候，判断是非根模块，同时`hot`也是父模块的hot。此时会找到`当前子模块的父模块`,把`当前子模块的state`注册到`当前子模块父模块的state`上,执行了 ` Vue.set(parentState, moduleName, module.state)`;   
+  
+  在执行 `makeLocalContext(sotre,当前模块的命名空间)`，根据`namespace == ''`为空判断出为有namespace `const noNamespace = false`, 为false,判断是子模块，然后会对`store.dispatch` 和 `store.commit`，具体的包装就是在调用的时候给`type`把加上模块的命名空间,`补全一下type`,然后在调用，`store.dispatch` 或者 `store.commit`,在action里面调用commit或者是dispatch，就可以传入第三个参数，以及根据`第三个参数的root为真`调用`其他模块的commit和 dispatch`
+  创建local对象如下：
+  ```
+
+  {
+
+    dispatch: (_type, _payload, _options)={
+      // 对传入的参数处理，生成新的参数 type payload, options
+      const args = unifyObjectStyle(_type, _payload, _options)
+      const { payload, options } = args
+      let { type } = args
+      // 这里就是在actions里面调用了 dispatch传入的options有root为真时候，就是直接调用传入的type，
+      if (!options || !options.root) {
+        //补全type 
+        type = namespace + type
+      }
+      return store.dispatch(type, payload)
+    },
+
+    commit: (_type, _payload, _options) => {
+      const args = unifyObjectStyle(_type, _payload, _options)
+      const { payload, options } = args
+      let { type } = args
+      // 这里就是在actions里面调用了 commit传入的options有root为真时候，就是直接调用传入的type，
+      if (!options || !options.root) {
+        //补全type 
+        type = namespace + type
+      }
+      store.commit(type, payload, options)
+    } ,
+    // Object.defineProperties 实现了 getters和state属性，下面的只是解释
+    getters: {
+       //其实就是访问当前模块的getter属性，最终都代理到了 store.getters，第一次访问会遍历所有的 store.getters，找到需要的那一个，然后缓存，再次方位就不用遍历store.getters
+      get:()=>{
+        // 原文函数是 makeLocalGetters函数， 遍历 store.getters 属性
+        //return makeLocalGetters(sotre,namespace)
+        //最终的实现效果如下
+        return ({
+            '子模块真实访问的getter属性名A':{
+              get: () => store.getters[type], 
+              // type为全的： 父模块的命名空间/当前模块命名空间/子模块真实访问的getter属性名A    比如 a/b/c,访问当前b模块的c属性就是访问 store.getters['a/b/c']
+            },
+             '子模块真实访问的getter属性名B':{
+              get: () => store.getters[type],
+              // type为全的： 父模块的命名空间/当前模块命名空间/子模块真实访问的getter属性名B 
+            }
+
+        })
+
+      }
+    },
+    //state: {
+    //  get: () => getNestedState(store.state, path)
+    // }
+    state: 当前模块的state， // 通过get属性和getNestedState(store.state,path)方法得到。访问时候就会执行get方法。
+  }
+
+
+
+  ```
+  对于本次示例，`子模块moduleA`,的local对象如下：
+  ```
+  {
+    dispatch:(_type, _payload, _options) => {
+      return  store.dispatch(`moduleA/${type}`, payload)
+    },
+    commit:{(_type, _payload, _options) => {
+      return  store.commit(`moduleA/${type}`, payload)
+    },
+    getters:{
+      get:()=>{
+           return ({
+            'aG':{
+              get: () => store.getters['moduleA/aG'], 
+            },
+            //... 其他属性
+        })
+      }
+    },
+    state:{
+      get:()=>{
+        return store.state['moduleA'] // moduleA的state， {a : 'aaa'}
+      }
+    }
+  }
+```
+
+
+
+
 2.3.2 注册 mutaions， _mutations对象的数据来源
 给 `Store类 的说明 中 _mutations` 中注测带命名的包装mutaion的函数 wrappedMutationHandler 的数组。
-把我们写的 rootMutationA函数封装了一层，在调用this.this.$store.commit('rootMutationA',payload),时候就会调用 wrappedMutationHandler(payload),同时会调用我们自己写的rootActionA函数,同时把当前模块的state作为第一个参数，payload作为第二个参数
+
+`第一次` 把我们写的 rootMutationA函数封装了一层，在调用this.$store.commit('rootMutationA',payload),时候就会调用 wrappedMutationHandler(payload),同时会调用我们自己写的rootActionA函数,同时把当前模块的state作为第一个参数，payload作为第二个参数
  
 
 这时候的 `module 是 this._modules.root`;`forEachMutation`方法可以在 `Module实例`中查看('src/module/module.js')
@@ -444,9 +557,40 @@ hot: 一个判断标记位，可不关注，为false和非根模块时候执行�
   ]
 ```
 
+ `非第一次执行`，子模块执行的时候， 把我们写的 `当前模块mutations `中的 mutation 函数封装了一层，在调用this.$store.commit(mutation,payload),时候就会调用 wrappedMutationHandler(payload),同时会调用我们自己写的mutation函数,同时把当前模块的state作为第一个参数，payload作为第二个参数;
+ 
+ 
+对于本示例中的子模块`moduleA`执行时候, 
+这时候的 `module 是 this._modules.root._children.moduleA`;
+
+```
+  module.forEachMutation((mutation, key) => {
+    const namespacedType = namespace + key 
+    // 此时的 namespace为"moduleA", key就是根模块中的 mutaions中命名函数，如 ”moduleA/aM“，
+    // 所以 namespacedType = "moduleA/aM"
+    // mutation 为 moduleA 模块中的 aM 函数
+    registerMutation(store, namespacedType, mutation, local)
+  })
+```
+上述函数执行完成后 `Store类 的说明 中 _mutations`暂时就变成了如下：
+```
+  // local为  步骤 2.3.1中生成的local对象 
+  _mutations['moduleA/aM'] = [ 
+    function wrappedMutationHandler(payload){
+      aM.call(store,
+        // 我们写的模板中第一个参数
+        local.state,  
+        // 我们写的模板中的第二个参数
+        payload
+      )
+    }
+  ]
+```
+
 2.3.3 注册 actions ，_actions的数据来源   
 给 `Store类 的说明 中 _actions` 中注测带命名的包装action的函数 wrappedActionHandler 的数组。  
-把我们写的 rootActionA函数封装了一层，在调用this.$store.dispatch('rootActionA',payload),时候就会调用 wrappedActionHandler(payload),同时会调用我们自己写的rootActionA函数
+
+`第一次执行`，根模块执行， 把我们写的 rootActionA函数封装了一层，在调用this.$store.dispatch('rootActionA',payload),时候就会调用 wrappedActionHandler(payload),同时会调用我们自己写的rootActionA函数
  
 这时候的 `module 是 this._modules.root`;
 ```
@@ -496,16 +640,70 @@ hot: 一个判断标记位，可不关注，为false和非根模块时候执行�
   ]
 ```
 
+
+把我们写的当前子模块函数封装了一层，在调用this.$store.dispatch('rootActionA',payload),时候就会调用 wrappedActionHandler(payload),同时会调用我们自己写的rootActionA函数
+
+`非第一次执行`，子模块执行的时候， 把我们写的 `当前模块actions `中的 action 函数封装了一层，在调用this.$store.dispatch(action,payload),时候就会调用 wrappedActionHandler(payload),同时会调用我们自己写的 action 函数, payload作为第二个参数;   
+
+对于本示例中的子模块`moduleA`执行时候, 
+这时候的 `module 是 this._modules.root._children.moduleA`;
+
+```
+  module.forEachAction((action, key) => {
+    // root属性存在 执行的是不带命名空间的，我们自己定义 action如果带了root为真的属性，其实相当于直接注册key的ation，而不是子模块命名空间+key的action
+    const type = action.root ? key : namespace + key; // type ='moduleA/' + 'aAtion'
+    const handler = action.handler || action
+    registerAction(store, type, handler, local)
+  })
+  
+```
+  
+上述函数执行完成后 `Store类 的说明 中 _actions`暂时就变成了如下：
+
+
+```
+ // local为  步骤 2.3.1中生成的local对象
+ // action 函数的执行结果是个 Promise对象
+
+ _actions['moduleA/aAtion'] = [ 
+    function wrappedActionHandler(payload){
+      let res = rootActionA.call(store, 
+        // 我们写的模板中第一个参数
+        {
+        dispatch: local.dispatch, 
+        commit: local.commit,
+        getters: local.getters,
+        state: local.state,
+        rootGetters: store.getters,
+        rootState: store.state
+        }, 
+        // 我们写的模板中的第二个参数
+        payload
+      );
+      if (!isPromise(res)) {
+        res = Promise.resolve(res)
+      }
+      if (store._devtoolHook) {
+        return res.catch(err => {
+          store._devtoolHook.emit('vuex:error', err)
+          throw err
+        })
+      } else {
+        return res
+      }
+    }
+  ]
+```
+
 2.3.4  注册getters函数模板，_wrappedGetters 数据来源
 
 给 `Store类 的说明 中 _wrappedGetters` 中注测带命名的包装getter的函数 wrappedGetter函数。  
 
-把我们写的 rootGetterB 函数封装了一层，生成_wrappedGetters， 在调用执行后续的`resetStoreVM`函数,时候就会生成一个包装wrappedGetter的函数
+`第一次执行`，也就根模块执行，把我们写的 rootGetterB 函数封装了一层，生成_wrappedGetters， 在调用执行后续的`resetStoreVM`函数,时候就会生成一个包装wrappedGetter的函数
 `function wrappedGetterComputed（）{ wrappedGetter(store) } `传入根store对象,
 `生成一个vue的computed：{rootGetterB: wrappedGetterComputed }`,利用vue的计算属性，来调用`wrappedGetterComputed`,同时调用了 `wrappedGetter` 以及我们自己写的`rootGetterB`函数，在这个函数里面已经包装好了参数`local.state, local.getters, store.state,store.getters`
 
 这时候的 `module 是 this._modules.root`;
-
 ```
   module.forEachGetter((action, key) => {
     const namespacedType = namespace + key
@@ -516,26 +714,167 @@ hot: 一个判断标记位，可不关注，为false和非根模块时候执行�
   })
   
 ```
-
-
-  
 上述函数执行完成后 `Store类 的说明 中 _wrappedGetters`暂时就变成了如
 下：
-
 ```
 
  // local为  步骤 2.3.1中生成的local对象
-_wrappedGetters={
-  rootGetterB: wrappedGetter(store){ //store是在调用 resetStoreVM 传入的
-     return rawGetter(
+_wrappedGetters[rootGetterB] =  wrappedGetter(store){ 
+      //store是在调用 resetStoreVM 传入的
+     return rootGetterB(
       local.state, 
       local.getters, 
       store.state,
-      store.getters
+      store.getters)
+  }
+
+```
+
+
+`非第一次执行`，子模块执行的时候， 把我们写的 `当前子模块 geeters`中的 `getter名字` 函数封装了一层，生成_wrappedGetters， 在调用执行后续的`resetStoreVM`函数,时候就会生成一个包装wrappedGetter的函数
+`function wrappedGetterComputed（）{ wrappedGetter(store) } `传入根store对象,
+`生成一个vue的computed：{ getter名字: wrappedGetterComputed }`,利用vue的计算属性，来调用`wrappedGetterComputed`,同时调用了 `wrappedGetter` 以及我们自己写的`getter名字`函数，在这个函数里面已经包装好了参数`local.state, local.getters, store.state,store.getters`
+
+对于本示例中的子模块`moduleA`执行时候, 
+这时候的 `module 是 this._modules.root._children.moduleA`;
+
+```
+  module.forEachGetter((action, key) => {
+    const namespacedType = namespace + key
+    //namespacedType为 "moduleA/aG'
+    // getter 为 根模块中getters的 rootGetterB 
+    registerGetter(store, namespacedType, getter, local)
+  
+  })
+  
+```
+上述函数执行完成后 `Store类 的说明 中 _wrappedGetters`暂时就变成了如
+下：
+```
+
+ // local为  步骤 2.3.1中生成的local对象
+_wrappedGetters['moduleA/aG'] =  wrappedGetter(store){ 
+      //store是在调用 resetStoreVM 传入的
+     return aG(
+      local.state, 
+      local.getters, 
+      store.state,
+      store.getters)
+  }
+
+
+```
+
+2.3.5 处理子模块的,递归执行 `2.3里面的步骤` 
+ 遍历module.__children 属性，都执行`2.3`里面所有的步骤,传入新的模块和path
+
+```
+    // 遍历module.__children 属性   child为属性值， key为属性名
+   module.forEachChild((child, key) => {
+    installModule(store, rootState, path.concat(key), child, hot)
+    })
+
+``` 
+参数说明：
+ 这里的 
+ store就是 store实例，
+ rootState 就是根State，
+ path:是父模块的path加上当前模块的名字key，对于moduleA，key就是['moduleA'],如果moduleA还有子模块moduleB，key就是['moduleA','moduleB]
+  child就是path.concat(key)对应的模块， hot是父节点使用的hot
+
+ ```
+  module.forEachChild((child, key) => {
+    //这里的 store就是 store实例，rootState就是根State， path.concat(key)是父模块的path加上当前模块的名字key， child就是path.concat(key)对应的模块， hot是父节点使用的hot
+    installModule(store, rootState, path.concat(key), child, hot)
+  })
+ ```
+
+2.4 resetStoreVM  重置 `store._vm`属性
+ 通过resetStoreVM  重置 `store._vm`属性 ，使数据响应式。
+ ```
+
+ /**
+ * 将state响应式
+ * 重置传入stroe的_vm属性（_vm为new Vue）,其实传入的 store就是根Store
+ * @param {*} store
+ * @param {*} state
+ * @param {*} hot
+ * @desc  给传入进来的store根据state创创建_vm 属性的vue实例，
+ * 同时访问 store的getters的属性时候相当于访问_vm的属性，形成响应式
+ */
+function resetStoreVM (store, state, hot) {
+  //第一次执行没有该属性，
+  const oldVm = store._vm  
+
+  // bind store public getters
+  store.getters = {}
+  // reset local getters cache
+  //清空缓存 makeLocalGetters函数创建的命名空间结果存储对象_makeLocalGettersCache
+  store._makeLocalGettersCache = Object.create(null)
+  const wrappedGetters = store._wrappedGetters
+  const computed = {}
+
+  //  对 wrappedGetters执行 第二个函数操作，函数的参数分别是wrappedGetters的key对应的值，和key
+  //  wrappedGetters ={a:aGetter} (aGetter,key)
+  forEachValue(wrappedGetters, (fn, key) => {
+    // use computed to leverage its lazy-caching mechanism
+    // direct inline function use will lead to closure preserving oldVm.
+    // using partial to return function with only arguments preserved in closure environment.
+    //! computed[key] =function(){
+    //    fn(store)
+    //  }
+
+    // computed[a] = function(){ aGetter(store) } //这里的store只是一个形参
+    computed[key] = partial(fn, store) // 
+
+    // 获取getters对象的key属性值时候，就相当于或者的_vm的对应key属性值
+    Object.defineProperty(store.getters, key, {
+      get: () => store._vm[key], // 从
+      enumerable: true // for local getters
+    })
+  })
+
+  // use a Vue instance to store the state tree
+  // suppress warnings just in case the user has added
+  // some funky global mixins
+  const silent = Vue.config.silent
+  //?! 临时改变 silent属性 执行new Vue（）
+  //?! 为什么临时改变，暂时开不知道
+  Vue.config.silent = true
+  store._vm = new Vue({
+    data: {
+      $$state: state
+    },
+    computed
+  })
+  Vue.config.silent = silent
+
+  // enable strict mode for new vm
+  // options.strict 存在时候参会执行
+  if (store.strict) {
+    enableStrictMode(store)
+  }
+
+  // 在执行resetStoreVM之前  传入进来的store有_vm实例，先卸载掉旧的，因为不管如果都会重新创建_vm实例
+  if (oldVm) {
+    if (hot) {
+      // dispatch changes in all subscribed watchers
+      // to force getter re-evaluation for hot reloading.
+      store._withCommit(() => {
+        oldVm._data.$$state = null
+      })
+    }
+    Vue.nextTick(() => oldVm.$destroy())
   }
 }
 
-```
+ ```
+
+
+
+
+
+
 
 
 
