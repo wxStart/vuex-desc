@@ -526,7 +526,7 @@ hot: 一个判断标记位，可不关注，为false和非根模块时候执行�
 
 
 2.3.2 注册 mutaions， _mutations对象的数据来源
-给 `Store类 的说明 中 _mutations` 中注测带命名的包装mutaion的函数 wrappedMutationHandler 的数组。
+给 `Store类 的说明 中 _mutations` 中注测带命名的包装mutaion的函数 wrappedMutationHandler 的数组。    
 
 `第一次` 把我们写的 rootMutationA函数封装了一层，在调用this.$store.commit('rootMutationA',payload),时候就会调用 wrappedMutationHandler(payload),同时会调用我们自己写的rootActionA函数,同时把当前模块的state作为第一个参数，payload作为第二个参数
  
