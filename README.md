@@ -389,6 +389,9 @@ _modules = {
 ```
 
 2.3 执行 installModule函数
+   
+<b style="color:red">*</b> `第一次`和 `非第一次执行`，分别代表根模块和子模块的执行，所有子模块执行时候都是执行的`非第一次执行`.     
+
 
 执行`installModule(store,rootState,path,module,hot)` ,`installModule`函数有五个参数，按顺序分别为
 store：store实例,
