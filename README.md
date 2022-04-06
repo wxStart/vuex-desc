@@ -815,16 +815,19 @@ function resetStoreVM (store, state, hot) {
   const computed = {}
 
   //  对 wrappedGetters执行 第二个函数操作，函数的参数分别是wrappedGetters的key对应的值，和key
-  //  wrappedGetters ={a:aGetter} (aGetter,key)
+  /*  wrappedGetters ={a:function wrappedGetter(store){
+    return aGetter( local.state, 
+      local.getters, 
+      store.state,
+      store.getters)
+  }} */
   forEachValue(wrappedGetters, (fn, key) => {
-    // use computed to leverage its lazy-caching mechanism
-    // direct inline function use will lead to closure preserving oldVm.
-    // using partial to return function with only arguments preserved in closure environment.
     //! computed[key] =function(){
-    //    fn(store)
+    //    fn(store) //  相当于执行 wrappedGetter(store)，在这里里面会执行我们写的gtters模板
     //  }
-
-    // computed[a] = function(){ aGetter(store) } //这里的store只是一个形参
+    // computed[a] = function(){ 
+    //  return wrappedGetter(store) 
+    // } 
     computed[key] = partial(fn, store) // 
 
     // 获取getters对象的key属性值时候，就相当于或者的_vm的对应key属性值
@@ -843,7 +846,7 @@ function resetStoreVM (store, state, hot) {
   Vue.config.silent = true
   store._vm = new Vue({
     data: {
-      $$state: state
+      $$state: state, 访问store实际上访问的就是 this._vm._data.$$state
     },
     computed
   })
@@ -869,6 +872,32 @@ function resetStoreVM (store, state, hot) {
 }
 
  ```
+`resetStoreVM(store,rootState,hot)` 执行先把之前的`store._vm属性`起来，根据`store._wrappedGetters`对象创建全新的`store.getters `，同时访问`store.getters`的属性代理到`store._vm`，同时也清理了前一次store缓存的`命名空间为真的子模块getters`对象，避免因之前数据导致的缓存。在生成`store.getters`时候创建`store._vm`vue实例的`computed`对象，对象的key为命名空间加上getter属性名，比如本次实例的及结果:如下
+
+```
+  
+ // _wrappedGetter的结构参考 步骤2.3.4 
+ /*
+ wrappedGetterRootGetterB和wrappedGetterModuleAaG只是函数名字，没有意义参考2.3.4具体的函数
+ _wrappedGetters ={
+   rootGetterB: wrappedGetterRootGetterB,
+   'moduleA/aG' wrappedGetterModuleAaG
+ }
+ */
+  computed:{
+    rootGetterB:function(){
+      return wrappedGetterRootGetterB(store) //传入了store ，在里面执行了根模块的名字为rootGetterB的getters
+    },
+    'moduleA/aG':function(){
+      return wrappedGetterModuleAaG(store) //传入了store，在里面执行了moduleA模块的名字为aG的getters
+    }
+  }
+  //
+
+```
+访问`store.state`实际上访问的就是 ` store._vm._data.$$stat`,访问`store.getters`实际上访问的就是 `store._vm._data.computed`,所以我们在模板中写的state和getters就是响应式的。
+
+
 
 
 
